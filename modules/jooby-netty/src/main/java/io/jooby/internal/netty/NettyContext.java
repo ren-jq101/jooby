@@ -46,6 +46,7 @@ import java.util.stream.Stream;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import javax.net.ssl.SSLPeerUnverifiedException;
+import javax.net.ssl.SSLSession;
 
 import com.typesafe.config.Config;
 import io.jooby.Body;
@@ -289,16 +290,15 @@ public class NettyContext implements DefaultContext, ChannelFutureListener {
     }
   }
 
-  @Nonnull @Override public List<Certificate> getClientCertificates() {
+  @Nonnull @Override public List<Certificate> getClientCertificates()
+      throws SSLPeerUnverifiedException {
     SslHandler sslHandler = (SslHandler) ctx.channel().pipeline().get("ssl");
     if (sslHandler != null) {
-      try {
-        return Arrays.asList(sslHandler.engine().getSession().getPeerCertificates());
-      } catch (SSLPeerUnverifiedException x) {
-         throw SneakyThrows.propagate(x);
-      }
+      SSLSession session = sslHandler.engine().getSession();
+      return getRouter().getServerOptions().getSsl()
+          .getClientCertificates(session::getPeerCertificates);
     }
-    return new ArrayList<Certificate>();
+    return Collections.emptyList();
   }
 
   @Nonnull @Override public String getScheme() {

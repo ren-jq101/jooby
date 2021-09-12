@@ -12,13 +12,16 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.Paths;
+import java.security.cert.Certificate;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
 import java.util.stream.Stream;
 
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
+import javax.net.ssl.SSLPeerUnverifiedException;
 
 import com.typesafe.config.Config;
 
@@ -35,6 +38,21 @@ import com.typesafe.config.Config;
  * @since 2.3.0
  */
 public final class SslOptions {
+
+  /**
+   * Peer certificate provider. See {@link #getClientCertificates(PeerCertificateProvider)}
+   */
+  public interface PeerCertificateProvider {
+    /**
+     * The certificates presented by the client for mutual TLS. Empty if ssl is not enabled, or
+     * client authentication is not required.
+     *
+     * @return Client certificates.
+     * @throws SSLPeerUnverifiedException if the peer's identity has not been verified
+     */
+    Certificate[] getClientCertificates() throws SSLPeerUnverifiedException;
+  }
+
   /**
    * The desired SSL client authentication mode for SSL channels in server mode.
    */
@@ -76,17 +94,17 @@ public final class SslOptions {
 
   private String type = PKCS12;
 
-  private String cert;
-
-  private String trustCert;
-
   private String trustPassword;
-
-  private String privateKey;
 
   private ClientAuth clientAuth = ClientAuth.NONE;
 
   private List<String> protocol = Arrays.asList(TLS_V1_3, TLS_V1_2);
+
+  private SneakyThrows.Supplier<InputStream> certificate;
+
+  private SneakyThrows.Supplier<InputStream> privateKey;
+
+  private SneakyThrows.Supplier<InputStream> trustCertificate;
 
   /**
    * Certificate type. Default is {@link #PKCS12}.
@@ -109,49 +127,69 @@ public final class SslOptions {
   }
 
   /**
-   * A PKCS12 or X.509 certificate chain file in PEM format. It can be an absolute path or a
-   * classpath resource. Required.
+   * A PKCS12 or X.509 certificate chain file in PEM format.
    *
-   * @return A PKCS12 or X.509 certificate chain file in PEM format. It can be an absolute path or
-   *     a classpath resource. Required.
+   * @return A PKCS12 or X.509 certificate chain file in PEM format.
    */
-  public @Nonnull String getCert() {
-    return cert;
+  public @Nonnull SneakyThrows.Supplier<InputStream> getCertificate() {
+    return certificate;
   }
 
   /**
-   * Set certificate path. A PKCS12 or X.509 certificate chain file in PEM format.
-   * It can be an absolute path or a classpath resource. Required.
+   * Set certificate. A PKCS12 or X.509 certificate chain file in PEM format.
    *
-   * @param cert Certificate path or location.
+   * @param certificate Certificate.
    * @return Ssl options.
    */
-  public @Nonnull SslOptions setCert(@Nonnull String cert) {
-    this.cert = cert;
+  public @Nonnull SslOptions setCertificate(
+      @Nonnull SneakyThrows.Supplier<InputStream> certificate) {
+    this.certificate = certificate;
     return this;
   }
 
   /**
-   * A PKCS12 or X.509 certificate chain file in PEM format. It can be an absolute path or a
-   * classpath resource. Required for {@link ClientAuth#REQUIRED} or {@link ClientAuth#REQUESTED}.
+   * Set certificate path. A PKCS12 or X.509 certificate chain file in PEM format.
+   * It can be an absolute path or a classpath resource. Required.
    *
-   * @return A PKCS12 or X.509 certificate chain file in PEM format. It can be an absolute path or
-   *     a classpath resource. Required for {@link ClientAuth#REQUIRED} or
-   *     {@link ClientAuth#REQUESTED}.
+   * @param path Certificate path or location.
+   * @return Ssl options.
    */
-  public @Nullable String getTrustCert() {
-    return trustCert;
+  public @Nonnull SslOptions setCertificatePath(@Nonnull String path) {
+    return setCertificate(loadResource(getClass().getClassLoader(), path));
+  }
+
+  /**
+   * A PKCS12 or X.509 certificate chain file in PEM format. Required for
+   * {@link ClientAuth#REQUIRED} or {@link ClientAuth#REQUESTED}.
+   *
+   * @return A PKCS12 or X.509 certificate chain file in PEM format.
+   *    Required for {@link ClientAuth#REQUIRED} or {@link ClientAuth#REQUESTED}.
+   */
+  public @Nonnull SneakyThrows.Supplier<InputStream> getTrustCertificate() {
+    return trustCertificate;
+  }
+
+  /**
+   * Set certificate. A PKCS12 or X.509 certificate chain file in PEM format. Required.
+   *
+   * @param trustCertificate Certificate.
+   * @return Ssl options.
+   */
+  public @Nonnull SslOptions setTrustCertificate(
+      @Nonnull SneakyThrows.Supplier<InputStream> trustCertificate) {
+    this.trustCertificate = trustCertificate;
+    return this;
   }
 
   /**
    * Set certificate path. A PKCS12 or X.509 certificate chain file in PEM format.
    * It can be an absolute path or a classpath resource. Required.
    *
-   * @param trustCert Certificate path or location.
+   * @param path Certificate path or location.
    * @return Ssl options.
    */
-  public @Nonnull SslOptions setTrustCert(@Nullable String trustCert) {
-    this.trustCert = trustCert;
+  public @Nonnull SslOptions setTrustCertificatePath(@Nonnull String path) {
+    this.trustCertificate = loadResource(getClass().getClassLoader(), path);
     return this;
   }
 
@@ -176,27 +214,38 @@ public final class SslOptions {
   }
 
   /**
-   * Private key file location. A PKCS#8 private key file in PEM format. It can be an absolute path
-   * or a classpath resource. Required when using X.509 certificates.
+   * Private key file. A PKCS#8 private key file in PEM format. Required when using X.509
+   * certificates.
    *
-   * @return A PKCS#8 private key file in PEM format. It can be an absolute path or a classpath
-   *     resource. Required when using X.509 certificates.
+   * @return A PKCS#8 private key file in PEM format. Required when using X.509 certificates.
    */
-  public @Nullable String getPrivateKey() {
+  public @Nullable SneakyThrows.Supplier<InputStream> getPrivateKey() {
     return privateKey;
   }
 
   /**
-   * Set private key file location. A PKCS#8 private key file in PEM format. It can be an absolute
-   * path or a classpath resource. Required when using X.509 certificates.
+   * Set private key file. A PKCS#8 private key file in PEM format.
    *
-   * @param privateKey Private key file location. A PKCS#8 private key file in PEM format. It can
+   * @param privateKey Private key file. A PKCS#8 private key file in PEM format. It can
    *     be an absolute path or a classpath resource. Required when using X.509 certificates.
    * @return Ssl options.
    */
-  public @Nonnull SslOptions setPrivateKey(@Nullable String privateKey) {
+  public @Nonnull SslOptions setPrivateKey(
+      @Nullable SneakyThrows.Supplier<InputStream> privateKey) {
     this.privateKey = privateKey;
     return this;
+  }
+
+  /**
+   * Set private key file. A PKCS#8 private key file in PEM format. It can be an absolute
+   * path or a classpath resource. Required when using X.509 certificates.
+   *
+   * @param path Private key file. A PKCS#8 private key file in PEM format. It can
+   *     be an absolute path or a classpath resource. Required when using X.509 certificates.
+   * @return Ssl options.
+   */
+  public @Nonnull SslOptions setPrivateKeyPath(@Nonnull String path) {
+    return setPrivateKey(loadResource(getClass().getClassLoader(), path));
   }
 
   /**
@@ -231,7 +280,7 @@ public final class SslOptions {
    * @return Resource.
    * @throws IOException If file not found or can't be read it.
    */
-  public @Nonnull InputStream getResource(@Nonnull ClassLoader loader, @Nonnull String path)
+  private static @Nonnull InputStream getResource(@Nonnull ClassLoader loader, @Nonnull String path)
       throws IOException {
     InputStream resource = Stream
         .of(Paths.get(path), Paths.get(System.getProperty("user.dir"), path))
@@ -312,6 +361,37 @@ public final class SslOptions {
     return this;
   }
 
+  /**
+   * The certificates presented by the client for mutual TLS. Empty if ssl is not enabled, or
+   * client authentication is not required.
+   *
+   * @param provider Certificate provider.
+   * @return Client certificates.
+   * @throws SSLPeerUnverifiedException if the peer's identity has not been verified
+   */
+  public @Nonnull List<Certificate> getClientCertificates(@Nonnull PeerCertificateProvider provider)
+      throws SSLPeerUnverifiedException {
+    ClientAuth auth = getClientAuth();
+    if (auth == ClientAuth.REQUIRED) {
+      Certificate[] certificates = provider.getClientCertificates();
+      if (certificates == null || certificates.length == 0) {
+        throw new SSLPeerUnverifiedException("No peer certificates");
+      }
+      return Arrays.asList(certificates);
+    } else if (auth == ClientAuth.REQUESTED) {
+      try {
+        Certificate[] certificates = provider.getClientCertificates();
+        if (certificates == null || certificates.length == 0) {
+          return Collections.emptyList();
+        }
+        return Arrays.asList(certificates);
+      } catch (SSLPeerUnverifiedException x) {
+        return Collections.emptyList();
+      }
+    }
+    return Collections.emptyList();
+  }
+
   @Override public String toString() {
     return type;
   }
@@ -339,8 +419,8 @@ public final class SslOptions {
       @Nullable String password) {
     SslOptions options = new SslOptions();
     options.setType(X509);
-    options.setPrivateKey(key);
-    options.setCert(crt);
+    options.setPrivateKey(loadResource(options.getClass().getClassLoader(), key));
+    options.setCertificate(loadResource(options.getClass().getClassLoader(), crt));
     options.setPassword(password);
     return options;
   }
@@ -355,7 +435,7 @@ public final class SslOptions {
   public static SslOptions pkcs12(@Nonnull String crt, @Nonnull String password) {
     SslOptions options = new SslOptions();
     options.setType(PKCS12);
-    options.setCert(crt);
+    options.setCertificate(loadResource(options.getClass().getClassLoader(), crt));
     options.setPassword(password);
     return options;
   }
@@ -465,13 +545,13 @@ public final class SslOptions {
             options = new SslOptions();
             options.setType(type);
             if (X509.equalsIgnoreCase(type)) {
-              options.setCert(conf.getString(path + ".cert"));
-              options.setPrivateKey(conf.getString(path + ".key"));
+              options.setCertificatePath(conf.getString(path + ".cert"));
+              options.setPrivateKeyPath(conf.getString(path + ".key"));
               if (conf.hasPath(path + ".password")) {
                 options.setPassword(conf.getString(path + ".password"));
               }
             } else if (type.equalsIgnoreCase(PKCS12)) {
-              options.setCert(conf.getString(path + ".cert"));
+              options.setCertificatePath(conf.getString(path + ".cert"));
               options.setPassword(conf.getString(path + ".password"));
             } else {
               throw new UnsupportedOperationException("SSL type: " + type);
@@ -482,7 +562,7 @@ public final class SslOptions {
                 .toUpperCase()));
           }
           if (conf.hasPath(path + ".trust.cert")) {
-            options.setTrustCert(conf.getString(path + ".trust.cert"));
+            options.setTrustCertificatePath(conf.getString(path + ".trust.cert"));
           }
           if (conf.hasPath(path + ".trust.password")) {
             options.setTrustPassword(conf.getString(path + ".trust.password"));
@@ -497,5 +577,9 @@ public final class SslOptions {
           }
           return options;
         });
+  }
+
+  private static SneakyThrows.Supplier loadResource(ClassLoader loader, String path) {
+    return () -> getResource(loader, path);
   }
 }

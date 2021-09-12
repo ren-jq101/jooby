@@ -9,6 +9,8 @@ import io.jooby.exception.RegistryException;
 
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
+import javax.net.ssl.SSLPeerUnverifiedException;
+
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.io.PrintWriter;
@@ -268,7 +270,8 @@ public class ForwardingContext implements Context {
     return ctx.getProtocol();
   }
 
-  @Override @Nonnull public List<Certificate> getClientCertificates() {
+  @Override @Nonnull public List<Certificate> getClientCertificates() throws
+      SSLPeerUnverifiedException {
     return ctx.getClientCertificates();
   }
 

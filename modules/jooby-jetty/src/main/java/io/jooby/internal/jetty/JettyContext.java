@@ -5,6 +5,55 @@
  */
 package io.jooby.internal.jetty;
 
+import static org.eclipse.jetty.http.HttpHeader.CONTENT_TYPE;
+import static org.eclipse.jetty.http.HttpHeader.SET_COOKIE;
+import static org.eclipse.jetty.server.Request.MULTIPART_CONFIG_ELEMENT;
+
+import java.io.FileInputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
+import java.io.PrintWriter;
+import java.nio.ByteBuffer;
+import java.nio.channels.Channels;
+import java.nio.channels.FileChannel;
+import java.nio.channels.ReadableByteChannel;
+import java.nio.charset.Charset;
+import java.security.cert.Certificate;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.Enumeration;
+import java.util.HashMap;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.concurrent.Executor;
+
+import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
+import javax.net.ssl.SSLPeerUnverifiedException;
+import javax.servlet.AsyncContext;
+import javax.servlet.MultipartConfigElement;
+import javax.servlet.ServletException;
+import javax.servlet.WriteListener;
+import javax.servlet.http.Part;
+
+import org.eclipse.jetty.http.HttpFields;
+import org.eclipse.jetty.http.HttpHeader;
+import org.eclipse.jetty.http.HttpHeaderValue;
+import org.eclipse.jetty.http.MimeTypes;
+import org.eclipse.jetty.http.MultiPartFormInputStream;
+import org.eclipse.jetty.server.HttpOutput;
+import org.eclipse.jetty.server.Request;
+import org.eclipse.jetty.server.Response;
+import org.eclipse.jetty.util.BufferUtil;
+import org.eclipse.jetty.util.MultiMap;
+import org.eclipse.jetty.websocket.server.WebSocketServerFactory;
+import org.slf4j.Logger;
+
 import io.jooby.Body;
 import io.jooby.ByteRange;
 import io.jooby.CompletionListeners;
@@ -29,52 +78,6 @@ import io.jooby.StatusCode;
 import io.jooby.Value;
 import io.jooby.ValueNode;
 import io.jooby.WebSocket;
-import org.eclipse.jetty.http.HttpFields;
-import org.eclipse.jetty.http.HttpHeader;
-import org.eclipse.jetty.http.HttpHeaderValue;
-import org.eclipse.jetty.http.MimeTypes;
-import org.eclipse.jetty.http.MultiPartFormInputStream;
-import org.eclipse.jetty.server.HttpOutput;
-import org.eclipse.jetty.server.Request;
-import org.eclipse.jetty.server.Response;
-import org.eclipse.jetty.util.BufferUtil;
-import org.eclipse.jetty.util.MultiMap;
-import org.eclipse.jetty.websocket.server.WebSocketServerFactory;
-import org.slf4j.Logger;
-
-import javax.annotation.Nonnull;
-import javax.annotation.Nullable;
-import javax.servlet.AsyncContext;
-import javax.servlet.MultipartConfigElement;
-import javax.servlet.ServletException;
-import javax.servlet.WriteListener;
-import javax.servlet.http.Part;
-import java.io.FileInputStream;
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.OutputStream;
-import java.io.PrintWriter;
-import java.nio.ByteBuffer;
-import java.nio.channels.Channels;
-import java.nio.channels.FileChannel;
-import java.nio.channels.ReadableByteChannel;
-import java.nio.charset.Charset;
-import java.security.cert.Certificate;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.Enumeration;
-import java.util.HashMap;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
-import java.util.concurrent.Executor;
-
-import static org.eclipse.jetty.http.HttpHeader.CONTENT_TYPE;
-import static org.eclipse.jetty.http.HttpHeader.SET_COOKIE;
-import static org.eclipse.jetty.server.Request.MULTIPART_CONFIG_ELEMENT;
 
 public class JettyContext implements DefaultContext {
   private static final ByteBuffer EMPTY_BUFFER = ByteBuffer.wrap(new byte[0]);
@@ -283,8 +286,11 @@ public class JettyContext implements DefaultContext {
     return request.getProtocol();
   }
 
-  @Nonnull @Override public List<Certificate> getClientCertificates() {
-    return Arrays.asList((Certificate[]) request.getAttribute("javax.servlet.request.X509Certificate"));
+  @Nonnull @Override public List<Certificate> getClientCertificates() throws
+      SSLPeerUnverifiedException {
+    Certificate[] certificates = (Certificate[]) request
+        .getAttribute("javax.servlet.request.X509Certificate");
+    return getRouter().getServerOptions().getSsl().getClientCertificates(() -> certificates);
   }
 
   @Nonnull @Override public String getScheme() {

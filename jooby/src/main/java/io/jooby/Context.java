@@ -12,6 +12,8 @@ import io.jooby.internal.WebSocketSender;
 
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
+import javax.net.ssl.SSLPeerUnverifiedException;
+
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.io.PrintWriter;
@@ -629,11 +631,14 @@ public interface Context extends Registry {
   @Nonnull String getProtocol();
 
   /**
-   * The certificates presented by the client for mutual TLS. Empty if ssl is not enabled, or client authentication is not required.
+   * The certificates presented by the client for mutual TLS. Empty if ssl is not enabled, or
+   * client authentication is not required.
    *
-   * @return The certificates presented by the client for mutual TLS. Empty if ssl is not enabled, or client authentication is not required.
+   * @return The certificates presented by the client for mutual TLS. Empty if ssl is not enabled,
+   *      or client authentication is not required.
+   * @throws SSLPeerUnverifiedException if the peer's identity has not een verified.
    */
-  @Nonnull List<Certificate> getClientCertificates();
+  @Nonnull List<Certificate> getClientCertificates() throws SSLPeerUnverifiedException;
 
   /**
    * Server port for current request.

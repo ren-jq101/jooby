@@ -1,26 +1,7 @@
 package io.jooby;
 
-import okhttp3.Headers;
-import okhttp3.OkHttpClient;
-import okhttp3.RequestBody;
-import okhttp3.Response;
-import okhttp3.WebSocket;
-import okhttp3.WebSocketListener;
-import okhttp3.sse.EventSource;
-import okhttp3.sse.EventSourceListener;
-import okhttp3.sse.EventSources;
-import org.jetbrains.annotations.NotNull;
-import org.jetbrains.annotations.Nullable;
-
-import javax.net.ssl.SSLContext;
-import javax.net.ssl.TrustManager;
-import javax.net.ssl.X509TrustManager;
 import java.io.IOException;
 import java.net.SocketTimeoutException;
-import java.security.KeyManagementException;
-import java.security.NoSuchAlgorithmException;
-import java.security.cert.CertificateException;
-import java.security.cert.X509Certificate;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -32,6 +13,20 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.BiConsumer;
 import java.util.function.Consumer;
+
+import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
+
+import okhttp3.Headers;
+import okhttp3.OkHttpClient;
+import okhttp3.RequestBody;
+import okhttp3.Response;
+import okhttp3.WebSocket;
+import okhttp3.WebSocketListener;
+import okhttp3.sse.EventSource;
+import okhttp3.sse.EventSourceListener;
+import okhttp3.sse.EventSources;
+import okhttp3.tls.HandshakeCertificates;
 
 public class WebClient implements AutoCloseable {
 
@@ -317,29 +312,17 @@ public class WebClient implements AutoCloseable {
     client.connectionPool().evictAll();
   }
 
-  private static void configureSelfSigned(OkHttpClient.Builder builder)
-      throws NoSuchAlgorithmException, KeyManagementException {
-    X509TrustManager trustManager = new X509TrustManager() {
-      @Override
-      public X509Certificate[] getAcceptedIssuers() {
-        return new X509Certificate[0];
-      }
+  private static void configureSelfSigned(OkHttpClient.Builder builder) {
+    // https://github.com/square/okhttp/tree/master/okhttp-tls
+    HandshakeCertificates clientCertificates = new HandshakeCertificates.Builder()
+        .addInsecureHost("localhost")
+        .addPlatformTrustedCertificates()
+        .build();
 
-      @Override
-      public void checkServerTrusted(final X509Certificate[] chain,
-          final String authType) throws CertificateException {
-      }
+    builder
+        .sslSocketFactory(clientCertificates.sslSocketFactory(),
+            clientCertificates.trustManager());
 
-      @Override
-      public void checkClientTrusted(final X509Certificate[] chain,
-          final String authType) throws CertificateException {
-      }
-    };
-
-    SSLContext sslContext = SSLContext.getInstance("SSL");
-
-    sslContext.init(null, new TrustManager[]{trustManager}, new java.security.SecureRandom());
-    builder.sslSocketFactory(sslContext.getSocketFactory(), trustManager);
     builder.hostnameVerifier((hostname, session) -> true);
   }
 

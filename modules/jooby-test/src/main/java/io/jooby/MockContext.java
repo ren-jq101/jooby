@@ -25,6 +25,7 @@ import java.nio.file.Path;
 import java.security.cert.Certificate;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -94,6 +95,8 @@ public class MockContext implements DefaultContext {
   private String scheme = "http";
 
   private int port = -1;
+
+  private List<Certificate> clientCertificates = Collections.emptyList();
 
   @Nonnull @Override public String getMethod() {
     return method;
@@ -542,7 +545,18 @@ public class MockContext implements DefaultContext {
   }
 
   @Nonnull @Override public List<Certificate> getClientCertificates() {
-    return new ArrayList<Certificate>();
+    return clientCertificates;
+  }
+
+  /**
+   * Set client/peer certificates.
+   *
+   * @param clientCertificates Client certificates.
+   * @return This context.
+   */
+  public Context setClientCertificates(List<Certificate> clientCertificates) {
+    this.clientCertificates = clientCertificates;
+    return this;
   }
 
   @Nonnull @Override public String getScheme() {

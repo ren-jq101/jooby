@@ -298,6 +298,35 @@ server {
 }
 ----
 
+==== Certificate loader
+
+Certificates can be provided from any source using an `InputStream`:
+
+.With input stream
+[source,java,role="primary"]
+----
+{
+  SslOptions ssl = new SslOptions();
+  ssl.setCertificate(() -> new FileInputStream("path/to/certificate.p12"))
+}
+----
+
+.Kotlin
+[source,kotlin,role="secondary"]
+----
+{
+  serverOptions {
+    ssl = SslOptions().apply {
+      setCertificate {
+        FileInputStream("path/to/certificate.p12")
+      }
+    }
+  }
+}
+----
+
+This allow to load certificates from disk, database or even memory.
+
 ==== Client Authentication (Mutual TLS)
 
 To enable 2-way TLS (Mutual TLS), set the trust certificate and client authentication. Setting the trust certificate is required if using self-signed or custom generated certificates so that the server will trust the client's certificate signing authority.
@@ -307,9 +336,10 @@ To enable 2-way TLS (Mutual TLS), set the trust certificate and client authentic
 ----
 {
   SslOptions ssl = SslOptions.pkcs12("path/to/server.p12", "password")
-    .setTrustCert("path/to/trustCert") <1>
+    .setTrustCertificatePath("path/to/trustCert") <1>
     .setTrustPassword("password") <2>
     .setClientAuth(SslOptions.ClientAuth.REQUIRED); <3>
+
   setServerOptions(new ServerOptions()
       .setSsl(ssl)                                                      
   );
@@ -322,8 +352,8 @@ To enable 2-way TLS (Mutual TLS), set the trust certificate and client authentic
 {
   serverOptions {
     ssl = SslOptions.pkcs12("path/to/server.p12", "password")
-      .trustCert("path/to/trustCert") <1>
-      .trustPassword("password") <2>
+      .setTrustCertificatePath("path/to/trustCert") <1>
+      .setTrustPassword("password") <2>
       .clientAuth(SslOptions.ClientAuth.REQUIRED) <3>
   }
 }

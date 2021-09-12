@@ -17,8 +17,7 @@ Style guidelines:
 ////
 
 = Welcome to Jooby!
-Jooby Project <support@jooby.io>
-{joobyVersion}
+author: Edgar Espina; version: {joobyVersion}
 
 [discrete]
 == &infin; do more, more easily

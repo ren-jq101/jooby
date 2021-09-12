@@ -3,6 +3,7 @@ package io.jooby
 import io.jooby.RouterOption.IGNORE_CASE
 import io.jooby.RouterOption.IGNORE_TRAILING_SLASH
 import kotlinx.coroutines.delay
+import java.io.FileInputStream
 import java.nio.file.Paths
 import java.time.Duration
 
@@ -43,7 +44,11 @@ class Idioms : Kooby({
     workerThreads = 99
     securePort = 8443
     ssl = SslOptions().apply {
-      cert = "/path/to/certificate.crt"
+      setCertificatePath("/path/to/certificate.crt")
+
+      setCertificate {
+        FileInputStream("/path/to/certificate.crt")
+      }
     }
   }
 

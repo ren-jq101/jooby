@@ -25,7 +25,7 @@ public class SslPkcs12Provider implements SslContextProvider {
 
   @Override public SSLContext create(ClassLoader loader, String provider, SslOptions options) {
     try {
-      KeyStore store = keystore(options, loader, options.getCert(), options.getPassword());
+      KeyStore store = keystore(options.getCertificate(), options.getType(), options.getPassword());
       KeyManagerFactory kmf = KeyManagerFactory
           .getInstance(KeyManagerFactory.getDefaultAlgorithm());
       kmf.init(store, toCharArray(options.getPassword()));
@@ -35,8 +35,8 @@ public class SslPkcs12Provider implements SslContextProvider {
           : SSLContext.getInstance("TLS", provider);
 
       TrustManager[] tms;
-      if (options.getTrustCert() != null) {
-        KeyStore trustStore = keystore(options, loader, options.getTrustCert(),
+      if (options.getTrustCertificate() != null) {
+        KeyStore trustStore = keystore(options.getTrustCertificate(), options.getType(),
             options.getTrustPassword());
 
         TrustManagerFactory tmf = TrustManagerFactory
@@ -54,10 +54,11 @@ public class SslPkcs12Provider implements SslContextProvider {
     }
   }
 
-  private KeyStore keystore(SslOptions options, ClassLoader loader, String file, String password)
+  private KeyStore keystore(SneakyThrows.Supplier<InputStream> provider, String type,
+      String password)
       throws Exception {
-    try (InputStream crt = options.getResource(loader, file)) {
-      KeyStore store = KeyStore.getInstance(options.getType());
+    try (InputStream crt = provider.get()) {
+      KeyStore store = KeyStore.getInstance(type);
       store.load(crt, toCharArray(password));
       return store;
     }
