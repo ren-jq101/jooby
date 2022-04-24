@@ -142,7 +142,7 @@ public class ReturnTypeParser {
                   .findFirst()
                   .map(h -> {
                     String desc = Type.getReturnType(h.getDesc()).getDescriptor();
-                    return "V".equals(desc) ? "java/lang/Object" : desc;
+                    return "V" .equals(desc) ? "java/lang/Object" : desc;
                   })
                   .orElse(null);
               String descriptor = Type
@@ -238,9 +238,15 @@ public class ReturnTypeParser {
       }
       return Object.class.getName();
     }
+    String methodName;
+    if (node.name.startsWith("access$invoke$")) {
+      methodName = node.name.substring("access$" .length());
+    } else {
+      methodName = node.name;
+    }
     Type returnType = Type.getReturnType(node.desc);
     return classMethods(ctx, node.owner).stream()
-        .filter(m -> m.name.equals(node.name) && m.desc.equals(node.desc))
+        .filter(m -> m.name.equals(methodName) && m.desc.equals(node.desc))
         .findFirst()
         .map(m -> Optional.ofNullable(m.signature)
             .map(s -> {
@@ -280,10 +286,12 @@ public class ReturnTypeParser {
       if (var != null) {
         if (var.signature == null) {
           /** Kotlin traversal: */
-          Optional<AbstractInsnNode> kt = InsnSupport.prev(varInsn).filter(kotlinIntrinsics())
+          Optional<AbstractInsnNode> kt = InsnSupport.prev(varInsn)
+              .filter(kotlinIntrinsics())
               .findFirst();
           if (kt.isPresent()) {
-            LocalVariableNode $this = vars.stream().filter(v -> v.name.equals("this"))
+            LocalVariableNode $this = vars.stream()
+                .filter(v -> v.name.equals("this"))
                 .findFirst()
                 .orElse(null);
             if ($this != null) {
@@ -329,9 +337,48 @@ public class ReturnTypeParser {
           return type;
         }
         return ASMType.parse(var.signature);
+      } else {
+        LocalVariableNode $this$get = vars.stream()
+            .filter(it -> it.name.equals("$this$get"))
+            .findFirst()
+            .orElse(null);
+        // Kotlin lambda?
+        if ($this$get != null) {
+          LocalVariableNode $this = vars.stream()
+              .filter(it -> it.name.equals("this"))
+              .findFirst()
+              .orElse(null);
+          ClassNode classNode = ctx.classNodeOrNull(Type.getType($this.desc));
+          if (classNode != null) {
+            // look inside it
+            return fromKotlinLambda(ctx, classNode, $this$get.desc).get(0);
+          }
+        }
+        return InsnSupport.prev(varInsn)
+            .filter(VarInsnNode.class::isInstance)
+            .map(VarInsnNode.class::cast)
+            .filter(it -> it.getOpcode() == Opcodes.ASTORE && it.var == varInsn.var)
+            .findFirst()
+            .map(it -> it.getPrevious())
+            .filter(MethodInsnNode.class::isInstance)
+            .map(MethodInsnNode.class::cast)
+            .map(it -> ASMType.parse(it.desc))
+            .orElse(Object.class.getName());
       }
     }
     return Object.class.getName();
+  }
+
+  private static List<String> fromKotlinLambda(ParserContext ctx, ClassNode classNode,
+      String desc) {
+    MethodNode invoke = classNode.methods.stream()
+        .filter(it -> Signature.create(it).matches("invoke", TypeFactory.HANDLER_CONTEXT))
+        .findFirst()
+        .orElse(null);
+    if (invoke != null) {
+      return ReturnTypeParser.parse(ctx, invoke);
+    }
+    return Collections.singletonList(Object.class.getName());
   }
 
   private static Predicate<AbstractInsnNode> kotlinIntrinsics() {

@@ -183,7 +183,7 @@ public class RouteParser {
       }
       if (parameter.getIn().equals("query")) {
         boolean expand = ctx.schemaRef(javaType)
-            .filter(ref -> "object".equals(ref.schema.getType()))
+            .filter(ref -> "object" .equals(ref.schema.getType()))
             .isPresent();
         if (expand) {
           SchemaRef ref = ctx.schemaRef(javaType).get();
@@ -208,7 +208,7 @@ public class RouteParser {
   }
 
   private boolean isPassword(String name) {
-    return "password".equalsIgnoreCase(name) || "pass".equalsIgnoreCase(name);
+    return "password" .equalsIgnoreCase(name) || "pass" .equalsIgnoreCase(name);
   }
 
   private void uniqueOperationId(List<OperationExt> operations) {
@@ -337,26 +337,15 @@ public class RouteParser {
             boolean routes = signature.matches("routes", Runnable.class);
             routeIndex = handlerList.size();
             instructionTo = node;
-            //  router path (Ljava/lang/String;Ljava/lang/Runnable;)Lio/jooby/Route;
-            if (node.owner.equals(TypeFactory.KOOBY.getInternalName())) {
-              MethodInsnNode subrouteInsn = InsnSupport.prev(node)
-                  .filter(MethodInsnNode.class::isInstance)
-                  .findFirst()
-                  .map(MethodInsnNode.class::cast)
-                  .orElseThrow(() -> new IllegalStateException("Subroute definition not found"));
-              String path = routes ? "/" : routePattern(node, subrouteInsn);
-              handlerList.addAll(kotlinHandler(ctx, null, path(prefix, path), subrouteInsn));
-            } else {
-              InvokeDynamicInsnNode subrouteInsn = InsnSupport.prev(node)
-                  .filter(InvokeDynamicInsnNode.class::isInstance)
-                  .findFirst()
-                  .map(InvokeDynamicInsnNode.class::cast)
-                  .orElseThrow(() -> new IllegalStateException("Subroute definition not found"));
-              String path = routes ? "/" : routePattern(node, subrouteInsn);
-              MethodNode methodLink = findLambda(ctx, subrouteInsn);
-              ctx.debugHandlerLink(methodLink);
-              handlerList.addAll(routeHandler(ctx, path(prefix, path), methodLink));
-            }
+            InvokeDynamicInsnNode subrouteInsn = InsnSupport.prev(node)
+                .filter(InvokeDynamicInsnNode.class::isInstance)
+                .findFirst()
+                .map(InvokeDynamicInsnNode.class::cast)
+                .orElseThrow(() -> new IllegalStateException("Subroute definition not found"));
+            String path = routes ? "/" : routePattern(node, subrouteInsn);
+            MethodNode methodLink = findLambda(ctx, subrouteInsn);
+            ctx.debugHandlerLink(methodLink);
+            handlerList.addAll(routeHandler(ctx, path(prefix, path), methodLink));
           } else if (Router.METHODS.contains(signature.getMethod().toUpperCase())
               && signature.matches(String.class, Route.Handler.class)) {
             instructionTo = node;
@@ -672,7 +661,9 @@ public class RouteParser {
             return true;
           }
           if (it instanceof MethodInsnNode) {
-            return !Signature.create((MethodInsnNode) it).matches("<init>", KT_FUN_1);
+            Signature signature = Signature.create((MethodInsnNode) it);
+            return !signature.matches("<init>", KT_FUN_1) && !signature.matches(
+                "checkNotNullParameter");
           }
           return false;
         })
@@ -722,6 +713,11 @@ public class RouteParser {
       }
     }
     if (apply != null) {
+      try {
+        apply = kotlinFunctionReference(ctx, classNode, apply);
+      } catch (IllegalStateException x) {
+        // Ignore it
+      }
       // almost there can be one of two: 1) lambda itself or 2) method reference
       ctx.debugHandler(apply);
       handlerList.add(newRouteDescriptor(ctx, apply, httpMethod, prefix));
@@ -734,6 +730,9 @@ public class RouteParser {
     MethodInsnNode ref = InsnSupport.prev(node.instructions.getLast())
         .filter(MethodInsnNode.class::isInstance)
         .map(MethodInsnNode.class::cast)
+        .filter(it ->
+          !Signature.create(it).matches("valueOf")
+        )
         .findFirst()
         .orElseThrow(() -> new IllegalStateException("Kotlin reference function not found"));
     String refname = ref.name.equals("invoke")
