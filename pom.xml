@@ -99,7 +99,7 @@
     <jsonwebtoken.version>0.11.5</jsonwebtoken.version>
     <pac4j.version>4.5.6</pac4j.version>
     <quartz.version>2.3.2</quartz.version>
-    <cron-utils.version>9.1.6</cron-utils.version>
+    <cron-utils.version>9.2.0</cron-utils.version>
     <bucket4j-core.version>6.4.1</bucket4j-core.version>
     <aws-java-sdk.version>1.12.230</aws-java-sdk.version>
     <jmespath-java.version>${aws-java-sdk.version}</jmespath-java.version>
@@ -1416,10 +1416,8 @@
               </goals>
               <configuration>
                 <transformers>
-                  <transformer
-                      implementation="org.apache.maven.plugins.shade.resource.ServicesResourceTransformer"/>
-                  <transformer
-                      implementation="org.apache.maven.plugins.shade.resource.ManifestResourceTransformer">
+                  <transformer implementation="org.apache.maven.plugins.shade.resource.ServicesResourceTransformer"/>
+                  <transformer implementation="org.apache.maven.plugins.shade.resource.ManifestResourceTransformer">
                     <mainClass>${application.class}</mainClass>
                   </transformer>
                 </transformers>
