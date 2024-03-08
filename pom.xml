@@ -110,7 +110,7 @@
     <unbescape.version>1.1.6.RELEASE</unbescape.version>
 
     <!-- Kotlin -->
-    <kotlin.version>1.6.21</kotlin.version>
+    <kotlin.version>1.9.23</kotlin.version>
     <kotlinx-coroutines-core.version>1.6.2</kotlinx-coroutines-core.version>
     <kotlin.compiler.incremental>true</kotlin.compiler.incremental>
 
@@ -1416,10 +1416,8 @@
               </goals>
               <configuration>
                 <transformers>
-                  <transformer
-                      implementation="org.apache.maven.plugins.shade.resource.ServicesResourceTransformer"/>
-                  <transformer
-                      implementation="org.apache.maven.plugins.shade.resource.ManifestResourceTransformer">
+                  <transformer implementation="org.apache.maven.plugins.shade.resource.ServicesResourceTransformer"/>
+                  <transformer implementation="org.apache.maven.plugins.shade.resource.ManifestResourceTransformer">
                     <mainClass>${application.class}</mainClass>
                   </transformer>
                 </transformers>
